@@ -107,7 +107,7 @@ pub struct FileStorage {
 impl Drop for FileStorage {
     fn drop(&mut self) {
         if let Some(join_handle) = self.last_save_join_handle.take() {
-            profiling::scope!("wait_for_save");
+            // profiling::scope!("wait_for_save");
             join_handle.join().ok();
         }
     }
@@ -116,7 +116,7 @@ impl Drop for FileStorage {
 impl FileStorage {
     /// Store the state in this .ron file.
     pub(crate) fn from_ron_filepath(ron_filepath: impl Into<PathBuf>) -> Self {
-        profiling::function_scope!();
+        // profiling::function_scope!();
         let ron_filepath: PathBuf = ron_filepath.into();
         log::debug!("Loading app state from {:?}…", ron_filepath);
         Self {
@@ -129,7 +129,7 @@ impl FileStorage {
 
     /// Find a good place to put the files that the OS likes.
     pub fn from_app_id(app_id: &str) -> Option<Self> {
-        profiling::function_scope!();
+        // profiling::function_scope!();
         if let Some(data_dir) = storage_dir(app_id) {
             if let Err(err) = std::fs::create_dir_all(&data_dir) {
                 log::warn!(
@@ -162,7 +162,7 @@ impl crate::Storage for FileStorage {
 
     fn flush(&mut self) {
         if self.dirty {
-            profiling::scope!("FileStorage::flush");
+            // profiling::scope!("FileStorage::flush");
             self.dirty = false;
 
             let file_path = self.ron_filepath.clone();
@@ -191,7 +191,7 @@ impl crate::Storage for FileStorage {
 }
 
 fn save_to_disk(file_path: &PathBuf, kv: &HashMap<String, String>) {
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     if let Some(parent_dir) = file_path.parent() {
         if !parent_dir.exists() {
@@ -206,7 +206,7 @@ fn save_to_disk(file_path: &PathBuf, kv: &HashMap<String, String>) {
             let mut writer = std::io::BufWriter::new(file);
             let config = Default::default();
 
-            profiling::scope!("ron::serialize");
+            // profiling::scope!("ron::serialize");
             if let Err(err) = ron::Options::default()
                 .to_io_writer_pretty(&mut writer, &kv, config)
                 .and_then(|_| writer.flush().map_err(|err| err.into()))
@@ -228,7 +228,7 @@ fn read_ron<T>(ron_path: impl AsRef<Path>) -> Option<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    profiling::function_scope!();
+    // profiling::function_scope!();
     match std::fs::File::open(ron_path) {
         Ok(file) => {
             let reader = std::io::BufReader::new(file);

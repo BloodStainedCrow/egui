@@ -111,13 +111,13 @@ struct Plugins {
 
 impl Plugins {
     fn call(ctx: &Context, _cb_name: &str, callbacks: &[NamedContextCallback]) {
-        profiling::scope!("plugins", _cb_name);
+        // profiling::scope!("plugins", _cb_name);
         for NamedContextCallback {
             debug_name: _name,
             callback,
         } in callbacks
         {
-            profiling::scope!("plugin", _name);
+            // profiling::scope!("plugin", _name);
             (callback)(ctx);
         }
     }
@@ -539,7 +539,7 @@ impl ContextImpl {
 
         #[cfg(feature = "accesskit")]
         if self.is_accesskit_enabled {
-            profiling::scope!("accesskit");
+            // profiling::scope!("accesskit");
             use crate::pass_state::AccessKitPassState;
             let id = crate::accesskit_root_id();
             let mut root_node = accesskit::Node::new(accesskit::Role::Window);
@@ -558,7 +558,7 @@ impl ContextImpl {
 
     /// Load fonts unless already loaded.
     fn update_fonts_mut(&mut self) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
         let input = &self.viewport().input;
         let pixels_per_point = input.pixels_per_point();
         let max_texture_side = input.max_texture_side;
@@ -605,7 +605,7 @@ impl ContextImpl {
                 log::trace!("Creating new Fonts for pixels_per_point={pixels_per_point}");
 
                 is_new = true;
-                profiling::scope!("Fonts::new");
+                // profiling::scope!("Fonts::new");
                 Fonts::new(
                     pixels_per_point,
                     max_texture_side,
@@ -614,12 +614,12 @@ impl ContextImpl {
             });
 
         {
-            profiling::scope!("Fonts::begin_pass");
+            // profiling::scope!("Fonts::begin_pass");
             fonts.begin_pass(pixels_per_point, max_texture_side);
         }
 
         if is_new && self.memory.options.preload_font_glyphs {
-            profiling::scope!("preload_font_glyphs");
+            // profiling::scope!("preload_font_glyphs");
             // Preload the most common characters for the most common fonts.
             // This is not very important to do, but may save a few GPU operations.
             for font_id in self.memory.options.style().text_styles.values() {
@@ -801,7 +801,7 @@ impl Context {
     /// ```
     #[must_use]
     pub fn run(&self, mut new_input: RawInput, mut run_ui: impl FnMut(&Self)) -> FullOutput {
-        profiling::function_scope!();
+        // profiling::function_scope!();
         let viewport_id = new_input.viewport_id;
         let max_passes = self.write(|ctx| ctx.memory.options.max_passes.get());
 
@@ -813,14 +813,14 @@ impl Context {
         );
 
         loop {
-            profiling::scope!(
-                "pass",
-                output
-                    .platform_output
-                    .num_completed_passes
-                    .to_string()
-                    .as_str()
-            );
+            // profiling::scope!(
+            //     "pass",
+            //     output
+            //         .platform_output
+            //         .num_completed_passes
+            //         .to_string()
+            //         .as_str()
+            // );
 
             // We must move the `num_passes` (back) to the viewport output so that [`Self::will_discard`]
             // has access to the latest pass count.
@@ -886,7 +886,7 @@ impl Context {
     /// // handle full_output
     /// ```
     pub fn begin_pass(&self, new_input: RawInput) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         self.write(|ctx| ctx.begin_pass(new_input));
 
@@ -1787,7 +1787,7 @@ impl Context {
     /// The new fonts will become active at the start of the next pass.
     /// This will overwrite the existing fonts.
     pub fn set_fonts(&self, font_definitions: FontDefinitions) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let pixels_per_point = self.pixels_per_point();
 
@@ -1815,7 +1815,7 @@ impl Context {
     /// The new font will become active at the start of the next pass.
     /// This will keep the existing fonts.
     pub fn add_font(&self, new_font: FontInsert) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let pixels_per_point = self.pixels_per_point();
 
@@ -2133,7 +2133,7 @@ impl Context {
     /// Call at the end of each frame if you called [`Context::begin_pass`].
     #[must_use]
     pub fn end_pass(&self) -> FullOutput {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         if self.options(|o| o.zoom_with_keyboard) {
             crate::gui_zoom::zoom_with_keyboard(self);
@@ -2333,7 +2333,7 @@ impl ContextImpl {
                 // https://github.com/emilk/egui/issues/3664
                 // at the cost of a lot of performance.
                 // (This will override any smaller delta that was uploaded above.)
-                profiling::scope!("full_font_atlas_update");
+                // profiling::scope!("full_font_atlas_update");
                 let full_delta = ImageDelta::full(fonts.image(), TextureAtlas::texture_options());
                 tex_mngr.set(TextureId::default(), full_delta);
             }
@@ -2346,7 +2346,7 @@ impl ContextImpl {
 
         #[cfg(feature = "accesskit")]
         {
-            profiling::scope!("accesskit");
+            // profiling::scope!("accesskit");
             let state = viewport.this_pass.accesskit_state.take();
             if let Some(state) = state {
                 let root_id = crate::accesskit_root_id().accesskit_id();
@@ -2376,7 +2376,7 @@ impl ContextImpl {
         let mut repaint_needed = false;
 
         if self.memory.options.repaint_on_widget_change {
-            profiling::scope!("compare-widget-rects");
+            // profiling::scope!("compare-widget-rects");
             if viewport.prev_pass.widgets != viewport.this_pass.widgets {
                 repaint_needed = true; // Some widget has moved
             }
@@ -2515,7 +2515,7 @@ impl Context {
         shapes: Vec<ClippedShape>,
         pixels_per_point: f32,
     ) -> Vec<ClippedPrimitive> {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         // A tempting optimization is to reuse the tessellation from last frame if the
         // shapes are the same, but just comparing the shapes takes about 50% of the time
@@ -2542,7 +2542,7 @@ impl Context {
 
             let paint_stats = PaintStats::from_shapes(&shapes);
             let clipped_primitives = {
-                profiling::scope!("tessellator::tessellate_shapes");
+                // profiling::scope!("tessellator::tessellate_shapes");
                 tessellator::Tessellator::new(
                     pixels_per_point,
                     tessellation_options,
@@ -3435,7 +3435,7 @@ impl Context {
     pub fn forget_image(&self, uri: &str) {
         use load::BytesLoader as _;
 
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let loaders = self.loaders();
 
@@ -3457,7 +3457,7 @@ impl Context {
     pub fn forget_all_images(&self) {
         use load::BytesLoader as _;
 
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let loaders = self.loaders();
 
@@ -3492,7 +3492,7 @@ impl Context {
     /// [not_supported]: crate::load::LoadError::NotSupported
     /// [custom]: crate::load::LoadError::Loading
     pub fn try_load_bytes(&self, uri: &str) -> load::BytesLoadResult {
-        profiling::function_scope!(uri);
+        // profiling::function_scope!(uri);
 
         let loaders = self.loaders();
         let bytes_loaders = loaders.bytes.lock();
@@ -3529,7 +3529,7 @@ impl Context {
     /// [not_supported]: crate::load::LoadError::NotSupported
     /// [custom]: crate::load::LoadError::Loading
     pub fn try_load_image(&self, uri: &str, size_hint: load::SizeHint) -> load::ImageLoadResult {
-        profiling::function_scope!(uri);
+        // profiling::function_scope!(uri);
 
         let loaders = self.loaders();
         let image_loaders = loaders.image.lock();
@@ -3580,7 +3580,7 @@ impl Context {
         texture_options: TextureOptions,
         size_hint: load::SizeHint,
     ) -> load::TextureLoadResult {
-        profiling::function_scope!(uri);
+        // profiling::function_scope!(uri);
 
         let loaders = self.loaders();
         let texture_loaders = loaders.texture.lock();
@@ -3736,7 +3736,7 @@ impl Context {
         viewport_builder: ViewportBuilder,
         viewport_ui_cb: impl Fn(&Self, ViewportClass) + Send + Sync + 'static,
     ) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         if self.embed_viewports() {
             viewport_ui_cb(self, ViewportClass::Embedded);
@@ -3788,7 +3788,7 @@ impl Context {
         builder: ViewportBuilder,
         mut viewport_ui_cb: impl FnMut(&Self, ViewportClass) -> T,
     ) -> T {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         if self.embed_viewports() {
             return viewport_ui_cb(self, ViewportClass::Embedded);

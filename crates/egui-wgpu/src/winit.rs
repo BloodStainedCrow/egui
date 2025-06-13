@@ -95,7 +95,7 @@ impl Painter {
         render_state: &RenderState,
         config: &WgpuConfiguration,
     ) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let width = surface_state.width;
         let height = surface_state.height;
@@ -147,7 +147,7 @@ impl Painter {
         viewport_id: ViewportId,
         window: Option<Arc<winit::window::Window>>,
     ) -> Result<(), crate::WgpuError> {
-        profiling::scope!("Painter::set_window"); // profile_function gives bad names for async functions
+        // profiling::scope!("Painter::set_window"); // profile_function gives bad names for async functions
 
         if let Some(window) = window {
             let size = window.inner_size();
@@ -173,7 +173,7 @@ impl Painter {
         viewport_id: ViewportId,
         window: Option<&winit::window::Window>,
     ) -> Result<(), crate::WgpuError> {
-        profiling::scope!("Painter::set_window_unsafe"); // profile_function gives bad names for async functions
+        // profiling::scope!("Painter::set_window_unsafe"); // profile_function gives bad names for async functions
 
         if let Some(window) = window {
             let size = window.inner_size();
@@ -264,7 +264,7 @@ impl Painter {
         width_in_pixels: NonZeroU32,
         height_in_pixels: NonZeroU32,
     ) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let width = width_in_pixels.get();
         let height = height_in_pixels.get();
@@ -335,7 +335,7 @@ impl Painter {
         width_in_pixels: NonZeroU32,
         height_in_pixels: NonZeroU32,
     ) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         if self.surfaces.contains_key(&viewport_id) {
             self.resize_and_generate_depth_texture_view_and_msaa_view(
@@ -363,7 +363,7 @@ impl Painter {
         textures_delta: &epaint::textures::TexturesDelta,
         capture_data: Vec<UserData>,
     ) -> f32 {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let capture = !capture_data.is_empty();
         let mut vsync_sec = 0.0;
@@ -409,7 +409,7 @@ impl Painter {
         };
 
         let output_frame = {
-            profiling::scope!("get_current_texture");
+            // profiling::scope!("get_current_texture");
             // This is what vsync-waiting happens on my Mac.
             let start = web_time::Instant::now();
             let output_frame = surface_state.surface.get_current_texture();
@@ -505,13 +505,13 @@ impl Painter {
         }
 
         let encoded = {
-            profiling::scope!("CommandEncoder::finish");
+            // profiling::scope!("CommandEncoder::finish");
             encoder.finish()
         };
 
         // Submit the commands: both the main buffer and user-defined ones.
         {
-            profiling::scope!("Queue::submit");
+            // profiling::scope!("Queue::submit");
             // wgpu doesn't document where vsync can happen. Maybe here?
             let start = web_time::Instant::now();
             render_state
@@ -543,7 +543,7 @@ impl Painter {
         }
 
         {
-            profiling::scope!("present");
+            // profiling::scope!("present");
             // wgpu doesn't document where vsync can happen. Maybe here?
             let start = web_time::Instant::now();
             output_frame.present();

@@ -94,7 +94,7 @@ async fn request_adapter(
     compatible_surface: Option<&wgpu::Surface<'_>>,
     _available_adapters: &[wgpu::Adapter],
 ) -> Result<wgpu::Adapter, WgpuError> {
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -165,7 +165,7 @@ impl RenderState {
         msaa_samples: u32,
         dithering: bool,
     ) -> Result<Self, WgpuError> {
-        profiling::scope!("RenderState::create"); // async yield give bad names using `profile_function`
+        // profiling::scope!("RenderState::create"); // async yield give bad names using `profile_function`
 
         // This is always an empty list on web.
         #[cfg(not(target_arch = "wasm32"))]
@@ -207,7 +207,7 @@ impl RenderState {
                 }?;
 
                 let (device, queue) = {
-                    profiling::scope!("request_device");
+                    // profiling::scope!("request_device");
                     adapter
                         .request_device(&(*device_descriptor)(&adapter))
                         .await?
@@ -224,7 +224,7 @@ impl RenderState {
         };
 
         let surface_formats = {
-            profiling::scope!("get_capabilities");
+            // profiling::scope!("get_capabilities");
             compatible_surface.map_or_else(
                 || vec![wgpu::TextureFormat::Rgba8Unorm],
                 |s| s.get_capabilities(&adapter).formats,

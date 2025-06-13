@@ -12,7 +12,7 @@ use egui::SizeHint;
 /// On invalid image or unsupported image format.
 #[cfg(feature = "image")]
 pub fn load_image_bytes(image_bytes: &[u8]) -> Result<egui::ColorImage, egui::load::LoadError> {
-    profiling::function_scope!();
+    // profiling::function_scope!();
     let image = image::load_from_memory(image_bytes).map_err(|err| match err {
         image::ImageError::Unsupported(err) => match err.kind() {
             image::error::UnsupportedErrorKind::Format(format) => {
@@ -69,7 +69,7 @@ pub fn load_svg_bytes_with_size(
         usvg::{Transform, Tree},
     };
 
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     let rtree = Tree::from_data(svg_bytes, options).map_err(|err| err.to_string())?;
 

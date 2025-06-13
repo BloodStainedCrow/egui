@@ -102,7 +102,7 @@ impl<'app> WgpuWinitApp<'app> {
         native_options: NativeOptions,
         app_creator: AppCreator<'app>,
     ) -> Self {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         #[cfg(feature = "__screenshot")]
         assert!(
@@ -181,7 +181,7 @@ impl<'app> WgpuWinitApp<'app> {
         window: Window,
         builder: ViewportBuilder,
     ) -> crate::Result<&mut WgpuWinitRunning<'app>> {
-        profiling::function_scope!();
+        // profiling::function_scope!();
         let mut painter = pollster::block_on(egui_wgpu::winit::Painter::new(
             egui_ctx.clone(),
             self.native_options.wgpu_options.clone(),
@@ -197,7 +197,7 @@ impl<'app> WgpuWinitApp<'app> {
         let window = Arc::new(window);
 
         {
-            profiling::scope!("set_window");
+            // profiling::scope!("set_window");
             pollster::block_on(painter.set_window(ViewportId::ROOT, Some(window.clone())))?;
         }
 
@@ -266,7 +266,7 @@ impl<'app> WgpuWinitApp<'app> {
             raw_window_handle: window.window_handle().map(|h| h.as_raw()),
         };
         let app = {
-            profiling::scope!("user_app_creator");
+            // profiling::scope!("user_app_creator");
             app_creator(&cc).map_err(crate::Error::AppCreation)?
         };
 
@@ -508,7 +508,7 @@ impl WgpuWinitRunning<'_> {
     }
 
     fn save_and_destroy(&mut self) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         self.save();
 
@@ -524,7 +524,7 @@ impl WgpuWinitRunning<'_> {
 
     /// This is called both for the root viewport, and all deferred viewports
     fn run_ui_and_paint(&mut self, window_id: WindowId) -> Result<EventResult> {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let Some(viewport_id) = self
             .shared
@@ -536,7 +536,7 @@ impl WgpuWinitRunning<'_> {
             return Ok(EventResult::Wait);
         };
 
-        profiling::finish_frame!();
+        // // profiling::finish_frame!();
 
         let Self {
             app,
@@ -548,7 +548,7 @@ impl WgpuWinitRunning<'_> {
         frame_timer.start();
 
         let (viewport_ui_cb, raw_input) = {
-            profiling::scope!("Prepare");
+            // profiling::scope!("Prepare");
             let mut shared_lock = shared.borrow_mut();
 
             let SharedState {
@@ -592,7 +592,7 @@ impl WgpuWinitRunning<'_> {
             egui_winit::update_viewport_info(info, &integration.egui_ctx, window, false);
 
             {
-                profiling::scope!("set_window");
+                // profiling::scope!("set_window");
                 pollster::block_on(painter.set_window(viewport_id, Some(window.clone())))?;
             }
 
@@ -734,7 +734,7 @@ impl WgpuWinitRunning<'_> {
             if window.is_minimized() == Some(true) {
                 // On Mac, a minimized Window uses up all CPU:
                 // https://github.com/emilk/egui/issues/325
-                profiling::scope!("minimized_sleep");
+                // profiling::scope!("minimized_sleep");
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
@@ -861,7 +861,7 @@ impl Viewport {
             return; // we already have one
         }
 
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let viewport_id = self.ids.this;
 
@@ -902,7 +902,7 @@ fn create_window(
     storage: Option<&dyn Storage>,
     native_options: &mut NativeOptions,
 ) -> Result<(Window, ViewportBuilder), winit::error::OsError> {
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     let window_settings = epi_integration::load_window_settings(storage);
     let viewport_builder = epi_integration::viewport_builder(
@@ -923,7 +923,7 @@ fn render_immediate_viewport(
     shared: &RefCell<SharedState>,
     immediate_viewport: ImmediateViewport<'_>,
 ) {
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     let ImmediateViewport {
         ids,
@@ -1003,7 +1003,7 @@ fn render_immediate_viewport(
     };
 
     {
-        profiling::scope!("set_window");
+        // profiling::scope!("set_window");
         if let Err(err) = pollster::block_on(painter.set_window(ids.this, Some(window.clone()))) {
             log::error!(
                 "when rendering viewport_id={:?}, set_window Error {err}",
@@ -1111,7 +1111,7 @@ fn initialize_or_update_viewport<'a>(
     viewport_ui_cb: Option<Arc<dyn Fn(&egui::Context) + Send + Sync>>,
     painter: &mut egui_wgpu::winit::Painter,
 ) -> &'a mut Viewport {
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     if builder.icon.is_none() {
         // Inherit icon from parent

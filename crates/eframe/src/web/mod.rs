@@ -247,7 +247,7 @@ fn set_clipboard_image(image: &egui::ColorImage) {
 }
 
 fn to_image(image: &egui::ColorImage) -> Result<image::RgbaImage, String> {
-    profiling::function_scope!();
+    // profiling::function_scope!();
     image::RgbaImage::from_raw(
         image.width() as _,
         image.height() as _,
@@ -257,7 +257,7 @@ fn to_image(image: &egui::ColorImage) -> Result<image::RgbaImage, String> {
 }
 
 fn to_png_bytes(image: &image::RgbaImage) -> Result<Vec<u8>, String> {
-    profiling::function_scope!();
+    // profiling::function_scope!();
     let mut png_bytes: Vec<u8> = Vec::new();
     image
         .write_to(

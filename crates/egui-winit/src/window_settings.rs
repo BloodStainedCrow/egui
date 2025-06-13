@@ -59,7 +59,7 @@ impl WindowSettings {
         event_loop: &winit::event_loop::ActiveEventLoop,
         mut viewport_builder: ViewportBuilder,
     ) -> ViewportBuilder {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         // `WindowBuilder::with_position` expects inner position in Macos, and outer position elsewhere
         // See [`winit::window::WindowBuilder::with_position`] for details.
@@ -147,7 +147,7 @@ fn find_active_monitor(
     window_size_pts: egui::Vec2,
     position_px: &egui::Pos2,
 ) -> Option<winit::monitor::MonitorHandle> {
-    profiling::function_scope!();
+    // profiling::function_scope!();
     let monitors = event_loop.available_monitors();
 
     // default to primary monitor, in case the correct monitor was disconnected.
@@ -181,7 +181,7 @@ fn clamp_pos_to_monitors(
     window_size_pts: egui::Vec2,
     position_px: &mut egui::Pos2,
 ) {
-    profiling::function_scope!();
+    // profiling::function_scope!();
 
     let Some(active_monitor) =
         find_active_monitor(egui_zoom_factor, event_loop, window_size_pts, position_px)

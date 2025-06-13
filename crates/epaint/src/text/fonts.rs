@@ -852,7 +852,7 @@ impl GalleyCache {
         fonts: &mut FontsImpl,
         job: &LayoutJob,
     ) -> (Vec<Arc<Galley>>, Vec<u64>) {
-        profiling::function_scope!();
+        // profiling::function_scope!();
 
         let mut current_section = 0;
         let mut start = 0;
