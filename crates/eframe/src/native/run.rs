@@ -10,9 +10,8 @@ use ahash::HashMap;
 
 use super::winit_integration::{UserEvent, WinitApp};
 use crate::{
-    epi,
+    Result, epi,
     native::{event_loop_context, winit_integration::EventResult},
-    Result,
 };
 
 // ----------------------------------------------------------------------------
@@ -146,7 +145,7 @@ impl<T: WinitApp> WinitAppWrapper<T> {
             log::error!("Exiting because of error: {err}");
             exit = true;
             self.return_result = Err(err);
-        };
+        }
 
         if save {
             log::debug!("Received an EventResult::Save - saving app state");
@@ -177,7 +176,7 @@ impl<T: WinitApp> WinitAppWrapper<T> {
             .retain(|window_id, repaint_time| {
                 if now < *repaint_time {
                     return true; // not yet ready
-                };
+                }
 
                 event_loop.set_control_flow(ControlFlow::Poll);
 
@@ -193,7 +192,7 @@ impl<T: WinitApp> WinitAppWrapper<T> {
         let next_repaint_time = self.windows_next_repaint_times.values().min().copied();
         if let Some(next_repaint_time) = next_repaint_time {
             event_loop.set_control_flow(ControlFlow::WaitUntil(next_repaint_time));
-        };
+        }
     }
 }
 

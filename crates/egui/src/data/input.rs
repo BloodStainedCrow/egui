@@ -3,8 +3,8 @@
 use epaint::ColorImage;
 
 use crate::{
+    Key, OrderedViewportIdMap, Theme, ViewportId, ViewportIdMap,
     emath::{Pos2, Rect, Vec2},
-    Key, Theme, ViewportId, ViewportIdMap,
 };
 
 /// What the integrations provides to egui at the start of each frame.
@@ -256,9 +256,7 @@ impl ViewportInfo {
     /// If this is not the root viewport,
     /// it is up to the user to hide this viewport the next frame.
     pub fn close_requested(&self) -> bool {
-        self.events
-            .iter()
-            .any(|&event| event == ViewportEvent::Close)
+        self.events.contains(&ViewportEvent::Close)
     }
 
     /// Helper: move [`Self::events`], clone the other fields.
@@ -480,6 +478,9 @@ pub enum Event {
     ///
     /// As a user, check [`crate::InputState::smooth_scroll_delta`] to see if the user did any zooming this frame.
     Zoom(f32),
+
+    /// Rotation in radians this frame, measuring clockwise (e.g. from a rotation gesture).
+    Rotate(f32),
 
     /// IME Event
     Ime(ImeEvent),
@@ -842,6 +843,37 @@ impl Modifiers {
         self.cmd_ctrl_matches(pattern)
     }
 
+    /// Check if any of the modifiers match exactly.
+    ///
+    /// Returns true if the same modifier is pressed in `self` as in `pattern`,
+    /// for at least one modifier.
+    ///
+    /// ## Behavior:
+    /// ```
+    /// # use egui::Modifiers;
+    /// assert!(Modifiers::CTRL.matches_any(Modifiers::CTRL));
+    /// assert!(Modifiers::CTRL.matches_any(Modifiers::CTRL | Modifiers::SHIFT));
+    /// assert!((Modifiers::CTRL | Modifiers::SHIFT).matches_any(Modifiers::CTRL));
+    /// ```
+    pub fn matches_any(&self, pattern: Self) -> bool {
+        if self.alt && pattern.alt {
+            return true;
+        }
+        if self.shift && pattern.shift {
+            return true;
+        }
+        if self.ctrl && pattern.ctrl {
+            return true;
+        }
+        if self.mac_cmd && pattern.mac_cmd {
+            return true;
+        }
+        if (self.mac_cmd || self.command || self.ctrl) && pattern.command {
+            return true;
+        }
+        false
+    }
+
     /// Checks only cmd/ctrl, not alt/shift.
     ///
     /// `self` here are the currently pressed modifiers,
@@ -952,6 +984,12 @@ impl std::ops::BitOrAssign for Modifiers {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         *self = *self | rhs;
+    }
+}
+
+impl Modifiers {
+    pub fn ui(&self, ui: &mut crate::Ui) {
+        ui.label(ModifierNames::NAMES.format(self, ui.ctx().os().is_mac()));
     }
 }
 
@@ -1097,7 +1135,11 @@ impl RawInput {
         } = self;
 
         ui.label(format!("Active viewport: {viewport_id:?}"));
-        for (id, viewport) in viewports {
+        let ordered_viewports = viewports
+            .iter()
+            .map(|(id, value)| (*id, value))
+            .collect::<OrderedViewportIdMap<_>>();
+        for (id, viewport) in ordered_viewports {
             ui.group(|ui| {
                 ui.label(format!("Viewport {id:?}"));
                 ui.push_id(id, |ui| {

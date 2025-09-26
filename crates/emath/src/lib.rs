@@ -44,7 +44,7 @@ mod vec2b;
 
 pub use self::{
     align::{Align, Align2},
-    gui_rounding::{GuiRounding, GUI_ROUNDING},
+    gui_rounding::{GUI_ROUNDING, GuiRounding},
     history::History,
     numeric::*,
     ordered_float::*,
@@ -110,6 +110,21 @@ where
 {
     let range = range.into();
     (T::ONE - t) * *range.start() + t * *range.end()
+}
+
+/// This is a faster version of [`f32::midpoint`] which doesn't handle overflow.
+///
+/// ```
+/// # use emath::fast_midpoint;
+/// assert_eq!(fast_midpoint(1.0, 5.0), 3.0);
+/// ```
+#[inline(always)]
+pub fn fast_midpoint<R>(a: R, b: R) -> R
+where
+    R: Copy + Add<R, Output = R> + Div<R, Output = R> + One,
+{
+    let two = R::ONE + R::ONE;
+    (a + b) / two
 }
 
 /// Where in the range is this value? Returns 0-1 if within the range.
@@ -182,11 +197,7 @@ where
         );
         let t = (x - *from.start()) / (*from.end() - *from.start());
         // Ensure no numerical inaccuracies sneak in:
-        if T::ONE <= t {
-            *to.end()
-        } else {
-            lerp(to, t)
-        }
+        if T::ONE <= t { *to.end() } else { lerp(to, t) }
     }
 }
 

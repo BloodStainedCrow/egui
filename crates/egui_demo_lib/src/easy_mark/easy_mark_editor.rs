@@ -1,5 +1,5 @@
 use egui::{
-    text::CCursorRange, Key, KeyboardShortcut, Modifiers, ScrollArea, TextBuffer, TextEdit, Ui,
+    Key, KeyboardShortcut, Modifiers, ScrollArea, TextBuffer, TextEdit, Ui, text::CCursorRange,
 };
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -83,7 +83,7 @@ impl EasyMarkEditor {
             let mut layouter = |ui: &egui::Ui, easymark: &dyn TextBuffer, wrap_width: f32| {
                 let mut layout_job = highlighter.highlight(ui.style(), easymark.as_str());
                 layout_job.wrap.max_width = wrap_width;
-                ui.fonts(|f| f.layout_job(layout_job))
+                ui.fonts_mut(|f| f.layout_job(layout_job))
             };
 
             ui.add(
@@ -165,7 +165,7 @@ fn shortcuts(ui: &Ui, code: &mut dyn TextBuffer, ccursor_range: &mut CCursorRang
         if ui.input_mut(|i| i.consume_shortcut(&shortcut)) {
             any_change = true;
             toggle_surrounding(code, ccursor_range, surrounding);
-        };
+        }
     }
 
     any_change

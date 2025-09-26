@@ -3,14 +3,14 @@ use std::sync::Arc;
 use emath::TSTransform;
 
 use crate::{
-    layers::ShapeIdx, text::CCursor, text_selection::CCursorRange, Context, CursorIcon, Event,
-    Galley, Id, LayerId, Pos2, Rect, Response, Ui,
+    Context, CursorIcon, Event, Galley, Id, LayerId, Plugin, Pos2, Rect, Response, Ui,
+    layers::ShapeIdx, text::CCursor, text_selection::CCursorRange,
 };
 
 use super::{
-    text_cursor_state::cursor_rect,
-    visuals::{paint_text_selection, RowVertexIndices},
     TextCursorState,
+    text_cursor_state::cursor_rect,
+    visuals::{RowVertexIndices, paint_text_selection},
 };
 
 /// Turn on to help debug this
@@ -123,65 +123,45 @@ impl Default for LabelSelectionState {
     }
 }
 
-impl LabelSelectionState {
-    pub(crate) fn register(ctx: &Context) {
-        ctx.on_begin_pass("LabelSelectionState", std::sync::Arc::new(Self::begin_pass));
-        ctx.on_end_pass("LabelSelectionState", std::sync::Arc::new(Self::end_pass));
+impl Plugin for LabelSelectionState {
+    fn debug_name(&self) -> &'static str {
+        "LabelSelectionState"
     }
 
-    pub fn load(ctx: &Context) -> Self {
-        let id = Id::new(ctx.viewport_id());
-        ctx.data(|data| data.get_temp::<Self>(id))
-            .unwrap_or_default()
-    }
-
-    pub fn store(self, ctx: &Context) {
-        let id = Id::new(ctx.viewport_id());
-        ctx.data_mut(|data| {
-            data.insert_temp(id, self);
-        });
-    }
-
-    fn begin_pass(ctx: &Context) {
-        let mut state = Self::load(ctx);
-
+    fn on_begin_pass(&mut self, ctx: &Context) {
         if ctx.input(|i| i.pointer.any_pressed() && !i.modifiers.shift) {
             // Maybe a new selection is about to begin, but the old one is over:
             // state.selection = None; // TODO(emilk): this makes sense, but doesn't work as expected.
         }
 
-        state.selection_bbox_last_frame = state.selection_bbox_this_frame;
-        state.selection_bbox_this_frame = Rect::NOTHING;
+        self.selection_bbox_last_frame = self.selection_bbox_this_frame;
+        self.selection_bbox_this_frame = Rect::NOTHING;
 
-        state.any_hovered = false;
-        state.has_reached_primary = false;
-        state.has_reached_secondary = false;
-        state.text_to_copy.clear();
-        state.last_copied_galley_rect = None;
-        state.painted_selections.clear();
-
-        state.store(ctx);
+        self.any_hovered = false;
+        self.has_reached_primary = false;
+        self.has_reached_secondary = false;
+        self.text_to_copy.clear();
+        self.last_copied_galley_rect = None;
+        self.painted_selections.clear();
     }
 
-    fn end_pass(ctx: &Context) {
-        let mut state = Self::load(ctx);
-
-        if state.is_dragging {
+    fn on_end_pass(&mut self, ctx: &Context) {
+        if self.is_dragging {
             ctx.set_cursor_icon(CursorIcon::Text);
         }
 
-        if !state.has_reached_primary || !state.has_reached_secondary {
+        if !self.has_reached_primary || !self.has_reached_secondary {
             // We didn't see both cursors this frame,
             // maybe because they are outside the visible area (scrolling),
             // or one disappeared. In either case we will have horrible glitches, so let's just deselect.
 
-            let prev_selection = state.selection.take();
+            let prev_selection = self.selection.take();
             if let Some(selection) = prev_selection {
                 // This was the first frame of glitch, so hide the
                 // glitching by removing all painted selections:
                 ctx.graphics_mut(|layers| {
                     if let Some(list) = layers.get_mut(selection.layer_id) {
-                        for (shape_idx, row_selections) in state.painted_selections.drain(..) {
+                        for (shape_idx, row_selections) in self.painted_selections.drain(..) {
                             list.mutate_shape(shape_idx, |shape| {
                                 if let epaint::Shape::Text(text_shape) = &mut shape.shape {
                                     let galley = Arc::make_mut(&mut text_shape.galley);
@@ -211,25 +191,25 @@ impl LabelSelectionState {
         }
 
         let pressed_escape = ctx.input(|i| i.key_pressed(crate::Key::Escape));
-        let clicked_something_else = ctx.input(|i| i.pointer.any_pressed()) && !state.any_hovered;
+        let clicked_something_else = ctx.input(|i| i.pointer.any_pressed()) && !self.any_hovered;
         let delected_everything = pressed_escape || clicked_something_else;
 
         if delected_everything {
-            state.selection = None;
+            self.selection = None;
         }
 
         if ctx.input(|i| i.pointer.any_released()) {
-            state.is_dragging = false;
+            self.is_dragging = false;
         }
 
-        let text_to_copy = std::mem::take(&mut state.text_to_copy);
+        let text_to_copy = std::mem::take(&mut self.text_to_copy);
         if !text_to_copy.is_empty() {
             ctx.copy_text(text_to_copy);
         }
-
-        state.store(ctx);
     }
+}
 
+impl LabelSelectionState {
     pub fn has_selection(&self) -> bool {
         self.selection.is_some()
     }
@@ -297,7 +277,8 @@ impl LabelSelectionState {
         fallback_color: epaint::Color32,
         underline: epaint::Stroke,
     ) {
-        let mut state = Self::load(ui.ctx());
+        let plugin = ui.ctx().plugin::<Self>();
+        let mut state = plugin.lock();
         let new_vertex_indices = state.on_label(ui, response, galley_pos, &mut galley);
 
         let shape_idx = ui.painter().add(
@@ -309,8 +290,6 @@ impl LabelSelectionState {
                 .painted_selections
                 .push((shape_idx, new_vertex_indices));
         }
-
-        state.store(ui.ctx());
     }
 
     fn cursor_for(
@@ -530,7 +509,7 @@ impl LabelSelectionState {
 
         let mut cursor_state = self.cursor_for(ui, response, global_from_galley, galley);
 
-        let old_range = cursor_state.char_range();
+        let old_range = cursor_state.range(galley);
 
         if let Some(pointer_pos) = ui.ctx().pointer_interact_pos() {
             if response.contains_pointer() {
@@ -544,9 +523,9 @@ impl LabelSelectionState {
             }
         }
 
-        if let Some(mut cursor_range) = cursor_state.char_range() {
+        if let Some(mut cursor_range) = cursor_state.range(galley) {
             let galley_rect = global_from_galley * Rect::from_min_size(Pos2::ZERO, galley.size());
-            self.selection_bbox_this_frame = self.selection_bbox_this_frame.union(galley_rect);
+            self.selection_bbox_this_frame |= galley_rect;
 
             if let Some(selection) = &self.selection {
                 if selection.primary.widget_id == response.id {
@@ -562,7 +541,7 @@ impl LabelSelectionState {
         }
 
         // Look for changes due to keyboard and/or mouse interaction:
-        let new_range = cursor_state.char_range();
+        let new_range = cursor_state.range(galley);
         let selection_changed = old_range != new_range;
 
         if let (true, Some(range)) = (selection_changed, new_range) {
@@ -632,7 +611,7 @@ impl LabelSelectionState {
             }
         }
 
-        let cursor_range = cursor_state.char_range();
+        let cursor_range = cursor_state.range(galley);
 
         let mut new_vertex_indices = vec![];
 

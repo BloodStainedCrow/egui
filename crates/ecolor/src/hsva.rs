@@ -1,9 +1,10 @@
 use crate::{
-    gamma_u8_from_linear_f32, linear_f32_from_gamma_u8, linear_u8_from_linear_f32, Color32, Rgba,
+    Color32, Rgba, gamma_u8_from_linear_f32, linear_f32_from_gamma_u8, linear_u8_from_linear_f32,
 };
 
 /// Hue, saturation, value, alpha. All in the range [0, 1].
 /// No premultiplied alpha.
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Hsva {
     /// hue 0-1
@@ -233,7 +234,7 @@ pub fn rgb_from_hsv((h, s, v): (f32, f32, f32)) -> [f32; 3] {
 }
 
 #[test]
-#[ignore] // a bit expensive
+#[ignore = "too expensive"]
 fn test_hsv_roundtrip() {
     for r in 0..=255 {
         for g in 0..=255 {

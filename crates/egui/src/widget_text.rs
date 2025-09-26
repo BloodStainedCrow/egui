@@ -1,11 +1,11 @@
-use std::{borrow::Cow, sync::Arc};
-
 use emath::GuiRounding as _;
 use epaint::text::TextFormat;
+use std::fmt::Formatter;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::{
-    text::{LayoutJob, TextWrapping},
     Align, Color32, FontFamily, FontSelection, Galley, Style, TextStyle, TextWrapMode, Ui, Visuals,
+    text::{LayoutJob, TextWrapping},
 };
 
 /// Text and optional style choices for it.
@@ -307,7 +307,7 @@ impl RichText {
     /// Read the font height of the selected text style.
     ///
     /// Returns a value rounded to [`emath::GUI_ROUNDING`].
-    pub fn font_height(&self, fonts: &epaint::Fonts, style: &Style) -> f32 {
+    pub fn font_height(&self, fonts: &mut epaint::FontsView<'_>, style: &Style) -> f32 {
         let mut font_id = self.text_style.as_ref().map_or_else(
             || FontSelection::Default.resolve(style),
             |text_style| text_style.resolve(style),
@@ -422,10 +422,12 @@ impl RichText {
             font_id
         };
 
-        let mut background_color = background_color;
-        if code {
-            background_color = style.visuals.code_bg_color;
-        }
+        let background_color = if code {
+            style.visuals.code_bg_color
+        } else {
+            background_color
+        };
+
         let underline = if underline {
             crate::Stroke::new(1.0, line_color)
         } else {
@@ -519,6 +521,18 @@ pub enum WidgetText {
     /// You can color the text however you want, or use [`Color32::PLACEHOLDER`]
     /// which will be replaced with a color chosen by the widget that paints the text.
     Galley(Arc<Galley>),
+}
+
+impl std::fmt::Debug for WidgetText {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let text = self.text();
+        match self {
+            Self::Text(_) => write!(f, "Text({text:?})"),
+            Self::RichText(_) => write!(f, "RichText({text:?})"),
+            Self::LayoutJob(_) => write!(f, "LayoutJob({text:?})"),
+            Self::Galley(_) => write!(f, "Galley({text:?})"),
+        }
+    }
 }
 
 impl Default for WidgetText {
@@ -662,7 +676,7 @@ impl WidgetText {
     }
 
     /// Returns a value rounded to [`emath::GUI_ROUNDING`].
-    pub(crate) fn font_height(&self, fonts: &epaint::Fonts, style: &Style) -> f32 {
+    pub(crate) fn font_height(&self, fonts: &mut epaint::FontsView<'_>, style: &Style) -> f32 {
         match self {
             Self::Text(_) => fonts.row_height(&FontSelection::Default.resolve(style)),
             Self::RichText(text) => text.font_height(fonts, style),
@@ -732,17 +746,23 @@ impl WidgetText {
     ) -> Arc<Galley> {
         match self {
             Self::Text(text) => {
+                let color = style
+                    .visuals
+                    .override_text_color
+                    .unwrap_or(crate::Color32::PLACEHOLDER);
                 let mut layout_job = LayoutJob::simple_format(
                     text,
                     TextFormat {
-                        font_id: FontSelection::Default.resolve(style),
-                        color: crate::Color32::PLACEHOLDER,
+                        // We want the style overrides to take precedence over the fallback font
+                        font_id: FontSelection::default()
+                            .resolve_with_fallback(style, fallback_font),
+                        color,
                         valign: default_valign,
                         ..Default::default()
                     },
                 );
                 layout_job.wrap = text_wrapping;
-                ctx.fonts(|f| f.layout_job(layout_job))
+                ctx.fonts_mut(|f| f.layout_job(layout_job))
             }
             Self::RichText(text) => {
                 let mut layout_job = Arc::unwrap_or_clone(text).into_layout_job(
@@ -751,12 +771,12 @@ impl WidgetText {
                     default_valign,
                 );
                 layout_job.wrap = text_wrapping;
-                ctx.fonts(|f| f.layout_job(layout_job))
+                ctx.fonts_mut(|f| f.layout_job(layout_job))
             }
             Self::LayoutJob(job) => {
                 let mut job = Arc::unwrap_or_clone(job);
                 job.wrap = text_wrapping;
-                ctx.fonts(|f| f.layout_job(job))
+                ctx.fonts_mut(|f| f.layout_job(job))
             }
             Self::Galley(galley) => galley,
         }

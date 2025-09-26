@@ -9,7 +9,7 @@ use crate::collapsing_header::CollapsingState;
 use crate::*;
 
 use super::scroll_area::{ScrollBarVisibility, ScrollSource};
-use super::{area, resize, Area, Frame, Resize, ScrollArea};
+use super::{Area, Frame, Resize, ScrollArea, area, resize};
 
 /// Builder for a floating window which can be dragged, closed, collapsed, resized and scrolled (off by default).
 ///
@@ -476,7 +476,7 @@ impl Window<'_> {
         let (title_bar_height_with_margin, title_content_spacing) = if with_title_bar {
             let style = ctx.style();
             let title_bar_inner_height = ctx
-                .fonts(|fonts| title.font_height(fonts, &style))
+                .fonts_mut(|fonts| title.font_height(fonts, &style))
                 .at_least(style.spacing.interact_size.y);
             let title_bar_inner_height = title_bar_inner_height + window_frame.inner_margin.sum().y;
             let half_height = (title_bar_inner_height / 2.0).round() as _;
@@ -616,7 +616,7 @@ impl Window<'_> {
                             *where_to_put_header_background,
                             RectShape::filled(title_bar.inner_rect, round, header_color),
                         );
-                    };
+                    }
 
                     if false {
                         ctx.debug_painter().debug_rect(

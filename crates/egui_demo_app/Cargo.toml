@@ -69,7 +69,8 @@ bytemuck = { workspace = true, optional = true }
 puffin = { workspace = true, optional = true }
 puffin_http = { workspace = true, optional = true }
 # Enable both WebGL & WebGPU when targeting the web (these features have no effect when not targeting wasm32)
-wgpu = { workspace = true, features = ["webgpu", "webgl"], optional = true }
+# Also enable the default features so we have a supported backend for every platform.
+wgpu = { workspace = true, features = ["default", "webgpu", "webgl"], optional = true }
 
 
 # feature "http":
@@ -91,7 +92,7 @@ rfd = { version = "0.15.3", optional = true }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "=0.2.97"
+wasm-bindgen = "=0.2.100"
 wasm-bindgen-futures.workspace = true
 web-sys.workspace = true
 

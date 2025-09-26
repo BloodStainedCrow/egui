@@ -2,7 +2,7 @@ use std::iter::once;
 use std::sync::Arc;
 
 use egui::TexturesDelta;
-use egui_wgpu::{wgpu, RenderState, ScreenDescriptor, WgpuSetup};
+use egui_wgpu::{RenderState, ScreenDescriptor, WgpuSetup, wgpu};
 use image::RgbaImage;
 
 use crate::texture_to_image::texture_to_image;
@@ -190,6 +190,7 @@ impl crate::TestRenderer for WgpuTestRenderer {
                             load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                             store: wgpu::StoreOp::Store,
                         },
+                        depth_slice: None,
                     })],
                     ..Default::default()
                 })
@@ -205,7 +206,7 @@ impl crate::TestRenderer for WgpuTestRenderer {
         self.render_state
             .device
             .poll(wgpu::PollType::Wait)
-            .map_err(|e| format!("{e}"))?;
+            .map_err(|e| format!("{e:?}"))?;
 
         Ok(texture_to_image(
             &self.render_state.device,

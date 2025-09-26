@@ -3,18 +3,21 @@
 
 use emath::GuiRounding as _;
 use epaint::mutex::RwLock;
+use epaint::text::FontsView;
 use std::{any::Any, hash::Hash, sync::Arc};
 
-use crate::close_tag::ClosableTag;
-use crate::containers::menu;
+use crate::ClosableTag;
 #[cfg(debug_assertions)]
 use crate::Stroke;
+use crate::containers::menu;
 use crate::{
+    Align, Color32, Context, CursorIcon, DragAndDrop, Id, InnerResponse, InputState, IntoAtoms,
+    LayerId, Memory, Order, Painter, PlatformOutput, Pos2, Rangef, Rect, Response, Rgba, RichText,
+    Sense, Style, TextStyle, TextWrapMode, UiBuilder, UiKind, UiStack, UiStackInfo, Vec2,
+    WidgetRect, WidgetText,
     containers::{CollapsingHeader, CollapsingResponse, Frame},
     ecolor::Hsva,
-    emath, epaint,
-    epaint::text::Fonts,
-    grid,
+    emath, epaint, grid,
     layout::{Direction, Layout},
     pass_state,
     placer::Placer,
@@ -22,13 +25,9 @@ use crate::{
     util::IdTypeMap,
     vec2, widgets,
     widgets::{
-        color_picker, Button, Checkbox, DragValue, Hyperlink, Image, ImageSource, Label, Link,
-        RadioButton, SelectableLabel, Separator, Spinner, TextEdit, Widget,
+        Button, Checkbox, DragValue, Hyperlink, Image, ImageSource, Label, Link, RadioButton,
+        Separator, Spinner, TextEdit, Widget, color_picker,
     },
-    Align, Color32, Context, CursorIcon, DragAndDrop, Id, InnerResponse, InputState, LayerId,
-    Memory, Order, Painter, PlatformOutput, Pos2, Rangef, Rect, Response, Rgba, RichText, Sense,
-    Style, TextStyle, TextWrapMode, UiBuilder, UiKind, UiStack, UiStackInfo, Vec2, WidgetRect,
-    WidgetText,
 };
 // ----------------------------------------------------------------------------
 
@@ -124,6 +123,7 @@ impl Ui {
     pub fn new(ctx: Context, id: Id, ui_builder: UiBuilder) -> Self {
         let UiBuilder {
             id_salt,
+            global_scope: _,
             ui_stack_info,
             layer_id,
             max_rect,
@@ -250,6 +250,7 @@ impl Ui {
     pub fn new_child(&mut self, ui_builder: UiBuilder) -> Self {
         let UiBuilder {
             id_salt,
+            global_scope,
             ui_stack_info,
             layer_id,
             max_rect,
@@ -287,8 +288,14 @@ impl Ui {
         }
 
         debug_assert!(!max_rect.any_nan(), "max_rect is NaN: {max_rect:?}");
-        let stable_id = self.id.with(id_salt);
-        let unique_id = stable_id.with(self.next_auto_id_salt);
+        let (stable_id, unique_id) = if global_scope {
+            (id_salt, id_salt)
+        } else {
+            let stable_id = self.id.with(id_salt);
+            let unique_id = stable_id.with(self.next_auto_id_salt);
+
+            (stable_id, unique_id)
+        };
         let next_auto_id_salt = unique_id.value().wrapping_add(1);
 
         self.next_auto_id_salt = self.next_auto_id_salt.wrapping_add(1);
@@ -369,7 +376,7 @@ impl Ui {
     ///
     /// However, it is not necessarily globally unique.
     /// For instance, sibling `Ui`s share the same [`Self::id`]
-    /// unless they where explicitly given different id salts using
+    /// unless they were explicitly given different id salts using
     /// [`UiBuilder::id_salt`].
     #[inline]
     pub fn id(&self) -> Id {
@@ -522,7 +529,7 @@ impl Ui {
         self.enabled = false;
         if self.is_visible() {
             self.painter
-                .set_fade_to_color(Some(self.visuals().fade_out_to_color()));
+                .multiply_opacity(self.visuals().disabled_alpha());
         }
     }
 
@@ -727,7 +734,7 @@ impl Ui {
     ///
     /// Returns a value rounded to [`emath::GUI_ROUNDING`].
     pub fn text_style_height(&self, style: &TextStyle) -> f32 {
-        self.fonts(|f| f.row_height(&style.resolve(self.style())))
+        self.fonts_mut(|f| f.row_height(&style.resolve(self.style())))
     }
 
     /// Screen-space rectangle for clipping what we paint in this ui.
@@ -839,10 +846,16 @@ impl Ui {
         self.ctx().output_mut(writer)
     }
 
-    /// Read-only access to [`Fonts`].
+    /// Read-only access to [`FontsView`].
     #[inline]
-    pub fn fonts<R>(&self, reader: impl FnOnce(&Fonts) -> R) -> R {
+    pub fn fonts<R>(&self, reader: impl FnOnce(&FontsView<'_>) -> R) -> R {
         self.ctx().fonts(reader)
+    }
+
+    /// Read-write access to [`FontsView`].
+    #[inline]
+    pub fn fonts_mut<R>(&self, reader: impl FnOnce(&mut FontsView<'_>) -> R) -> R {
+        self.ctx().fonts_mut(reader)
     }
 }
 
@@ -1702,7 +1715,7 @@ impl Ui {
     /// The returned [`Response`] can be used to check for interactions,
     /// as well as adding tooltips using [`Response::on_hover_text`].
     ///
-    /// See also [`Self::add_sized`] and [`Self::put`].
+    /// See also [`Self::add_sized`], [`Self::place`] and [`Self::put`].
     ///
     /// ```
     /// # egui::__run_test_ui(|ui| {
@@ -1721,7 +1734,7 @@ impl Ui {
     ///
     /// To fill all remaining area, use `ui.add_sized(ui.available_size(), widget);`
     ///
-    /// See also [`Self::add`] and [`Self::put`].
+    /// See also [`Self::add`], [`Self::place`] and [`Self::put`].
     ///
     /// ```
     /// # egui::__run_test_ui(|ui| {
@@ -1740,9 +1753,23 @@ impl Ui {
             .inner
     }
 
-    /// Add a [`Widget`] to this [`Ui`] at a specific location (manual layout).
+    /// Add a [`Widget`] to this [`Ui`] at a specific location (manual layout) without
+    /// affecting this [`Ui`]s cursor.
     ///
-    /// See also [`Self::add`] and [`Self::add_sized`].
+    /// See also [`Self::add`] and [`Self::add_sized`] and [`Self::put`].
+    pub fn place(&mut self, max_rect: Rect, widget: impl Widget) -> Response {
+        self.new_child(
+            UiBuilder::new()
+                .max_rect(max_rect)
+                .layout(Layout::centered_and_justified(Direction::TopDown)),
+        )
+        .add(widget)
+    }
+
+    /// Add a [`Widget`] to this [`Ui`] at a specific location (manual layout) and advance the
+    /// cursor after the widget.
+    ///
+    /// See also [`Self::add`], [`Self::add_sized`], and [`Self::place`].
     pub fn put(&mut self, max_rect: Rect, widget: impl Widget) -> Response {
         self.scope_builder(
             UiBuilder::new()
@@ -1877,6 +1904,7 @@ impl Ui {
     /// Add extra space before the next widget.
     ///
     /// The direction is dependent on the layout.
+    /// Note that `add_space` isn't supported when in a grid layout.
     ///
     /// This will be in addition to the [`crate::style::Spacing::item_spacing`]
     /// that is always added, but `item_spacing` won't be added _again_ by `add_space`.
@@ -1884,6 +1912,7 @@ impl Ui {
     /// [`Self::min_rect`] will expand to contain the space.
     #[inline]
     pub fn add_space(&mut self, amount: f32) {
+        debug_assert!(!self.is_grid(), "add_space makes no sense in a grid layout");
         self.placer.advance_cursor(amount.round_ui());
     }
 
@@ -2055,8 +2084,8 @@ impl Ui {
     /// ```
     #[must_use = "You should check if the user clicked this with `if ui.button(…).clicked() { … } "]
     #[inline]
-    pub fn button(&mut self, text: impl Into<WidgetText>) -> Response {
-        Button::new(text).ui(self)
+    pub fn button<'a>(&mut self, atoms: impl IntoAtoms<'a>) -> Response {
+        Button::new(atoms).ui(self)
     }
 
     /// A button as small as normal body text.
@@ -2073,17 +2102,17 @@ impl Ui {
     ///
     /// See also [`Self::toggle_value`].
     #[inline]
-    pub fn checkbox(&mut self, checked: &mut bool, text: impl Into<WidgetText>) -> Response {
-        Checkbox::new(checked, text).ui(self)
+    pub fn checkbox<'a>(&mut self, checked: &'a mut bool, atoms: impl IntoAtoms<'a>) -> Response {
+        Checkbox::new(checked, atoms).ui(self)
     }
 
-    /// Acts like a checkbox, but looks like a [`SelectableLabel`].
+    /// Acts like a checkbox, but looks like a [`Button::selectable`].
     ///
     /// Click to toggle to bool.
     ///
     /// See also [`Self::checkbox`].
-    pub fn toggle_value(&mut self, selected: &mut bool, text: impl Into<WidgetText>) -> Response {
-        let mut response = self.selectable_label(*selected, text);
+    pub fn toggle_value<'a>(&mut self, selected: &mut bool, atoms: impl IntoAtoms<'a>) -> Response {
+        let mut response = self.selectable_label(*selected, atoms);
         if response.clicked() {
             *selected = !*selected;
             response.mark_changed();
@@ -2095,8 +2124,8 @@ impl Ui {
     /// Often you want to use [`Self::radio_value`] instead.
     #[must_use = "You should check if the user clicked this with `if ui.radio(…).clicked() { … } "]
     #[inline]
-    pub fn radio(&mut self, selected: bool, text: impl Into<WidgetText>) -> Response {
-        RadioButton::new(selected, text).ui(self)
+    pub fn radio<'a>(&mut self, selected: bool, atoms: impl IntoAtoms<'a>) -> Response {
+        RadioButton::new(selected, atoms).ui(self)
     }
 
     /// Show a [`RadioButton`]. It is selected if `*current_value == selected_value`.
@@ -2118,13 +2147,13 @@ impl Ui {
     /// }
     /// # });
     /// ```
-    pub fn radio_value<Value: PartialEq>(
+    pub fn radio_value<'a, Value: PartialEq>(
         &mut self,
         current_value: &mut Value,
         alternative: Value,
-        text: impl Into<WidgetText>,
+        atoms: impl IntoAtoms<'a>,
     ) -> Response {
-        let mut response = self.radio(*current_value == alternative, text);
+        let mut response = self.radio(*current_value == alternative, atoms);
         if response.clicked() && *current_value != alternative {
             *current_value = alternative;
             response.mark_changed();
@@ -2134,10 +2163,10 @@ impl Ui {
 
     /// Show a label which can be selected or not.
     ///
-    /// See also [`SelectableLabel`] and [`Self::toggle_value`].
+    /// See also [`Button::selectable`] and [`Self::toggle_value`].
     #[must_use = "You should check if the user clicked this with `if ui.selectable_label(…).clicked() { … } "]
-    pub fn selectable_label(&mut self, checked: bool, text: impl Into<WidgetText>) -> Response {
-        SelectableLabel::new(checked, text).ui(self)
+    pub fn selectable_label<'a>(&mut self, checked: bool, text: impl IntoAtoms<'a>) -> Response {
+        Button::selectable(checked, text).ui(self)
     }
 
     /// Show selectable text. It is selected if `*current_value == selected_value`.
@@ -2145,12 +2174,12 @@ impl Ui {
     ///
     /// Example: `ui.selectable_value(&mut my_enum, Enum::Alternative, "Alternative")`.
     ///
-    /// See also [`SelectableLabel`] and [`Self::toggle_value`].
-    pub fn selectable_value<Value: PartialEq>(
+    /// See also [`Button::selectable`] and [`Self::toggle_value`].
+    pub fn selectable_value<'a, Value: PartialEq>(
         &mut self,
         current_value: &mut Value,
         selected_value: Value,
-        text: impl Into<WidgetText>,
+        text: impl IntoAtoms<'a>,
     ) -> Response {
         let mut response = self.selectable_label(*current_value == selected_value, text);
         if response.clicked() && *current_value != selected_value {
@@ -2963,8 +2992,8 @@ impl Ui {
 
         if is_anything_being_dragged && !can_accept_what_is_being_dragged {
             // When dragging something else, show that it can't be dropped here:
-            fill = self.visuals().gray_out(fill);
-            stroke.color = self.visuals().gray_out(stroke.color);
+            fill = self.visuals().disable(fill);
+            stroke.color = self.visuals().disable(stroke.color);
         }
 
         frame.frame.fill = fill;
@@ -3041,15 +3070,15 @@ impl Ui {
     /// ```
     ///
     /// See also: [`Self::close`] and [`Response::context_menu`].
-    pub fn menu_button<R>(
+    pub fn menu_button<'a, R>(
         &mut self,
-        title: impl Into<WidgetText>,
+        atoms: impl IntoAtoms<'a>,
         add_contents: impl FnOnce(&mut Ui) -> R,
     ) -> InnerResponse<Option<R>> {
         let (response, inner) = if menu::is_in_menu(self) {
-            menu::SubMenuButton::new(title).ui(self, add_contents)
+            menu::SubMenuButton::new(atoms).ui(self, add_contents)
         } else {
-            menu::MenuButton::new(title).ui(self, add_contents)
+            menu::MenuButton::new(atoms).ui(self, add_contents)
         };
         InnerResponse::new(inner.map(|i| i.inner), response)
     }

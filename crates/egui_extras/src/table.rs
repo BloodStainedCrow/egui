@@ -4,13 +4,13 @@
 //! Takes all available height, so if you want something below the table, put it in a strip.
 
 use egui::{
-    scroll_area::{ScrollAreaOutput, ScrollBarVisibility, ScrollSource},
     Align, Id, NumExt as _, Rangef, Rect, Response, ScrollArea, Ui, Vec2, Vec2b,
+    scroll_area::{ScrollAreaOutput, ScrollBarVisibility, ScrollSource},
 };
 
 use crate::{
-    layout::{CellDirection, CellSize, StripLayoutFlags},
     StripLayout,
+    layout::{CellDirection, CellSize, StripLayoutFlags},
 };
 
 // -----------------------------------------------------------------=----------
@@ -851,7 +851,7 @@ impl Table<'_> {
             if column.is_auto() && (is_sizing_pass || !column_is_resizable) {
                 *column_width = width_range.clamp(max_used_widths[i]);
             } else if column_is_resizable {
-                let column_resize_id = ui.id().with("resize_column").with(i);
+                let column_resize_id = state_id.with("resize_column").with(i);
 
                 let mut p0 = egui::pos2(x, table_top);
                 let mut p1 = egui::pos2(x, bottom);

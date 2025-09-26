@@ -1,9 +1,10 @@
 use std::{any::Any, sync::Arc};
 
 use crate::{
+    Context, CursorIcon, Id, LayerId, PointerButton, Popup, PopupKind, Sense, Tooltip, Ui,
+    WidgetRect, WidgetText,
     emath::{Align, Pos2, Rect, Vec2},
-    pass_state, Context, CursorIcon, Id, LayerId, PointerButton, Popup, PopupKind, Sense, Tooltip,
-    Ui, WidgetRect, WidgetText,
+    pass_state,
 };
 // ----------------------------------------------------------------------------
 
@@ -58,8 +59,8 @@ pub struct Response {
 
     /// The intrinsic / desired size of the widget.
     ///
-    /// For a button, this will be the size of the label + the frames padding,
-    /// even if the button is laid out in a justified layout and the actual size will be larger.
+    /// This is the size that a non-wrapped, non-truncated, non-justified version of the widget
+    /// would have.
     ///
     /// If this is `None`, use [`Self::rect`] instead.
     ///
@@ -846,14 +847,13 @@ impl Response {
             WidgetType::Label => Role::Label,
             WidgetType::Link => Role::Link,
             WidgetType::TextEdit => Role::TextInput,
-            WidgetType::Button | WidgetType::ImageButton | WidgetType::CollapsingHeader => {
+            WidgetType::Button | WidgetType::CollapsingHeader | WidgetType::SelectableLabel => {
                 Role::Button
             }
             WidgetType::Image => Role::Image,
             WidgetType::Checkbox => Role::CheckBox,
             WidgetType::RadioButton => Role::RadioButton,
             WidgetType::RadioGroup => Role::RadioGroup,
-            WidgetType::SelectableLabel => Role::Button,
             WidgetType::ComboBox => Role::ComboBox,
             WidgetType::Slider => Role::Slider,
             WidgetType::DragValue => Role::SpinButton,

@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use emath::GuiRounding as _;
 use epaint::{
-    text::{Fonts, Galley, LayoutJob},
     CircleShape, ClippedShape, CornerRadius, PathStroke, RectShape, Shape, Stroke, StrokeKind,
+    text::{FontsView, Galley, LayoutJob},
 };
 
 use crate::{
+    Color32, Context, FontId,
     emath::{Align2, Pos2, Rangef, Rect, Vec2},
     layers::{LayerId, PaintList, ShapeIdx},
-    Color32, Context, FontId,
 };
 
 /// Helper to paint shapes and text to a specific region on a specific layer.
@@ -83,6 +83,7 @@ impl Painter {
     }
 
     /// If set, colors will be modified to look like this
+    #[deprecated = "Use `multiply_opacity` instead"]
     pub fn set_fade_to_color(&mut self, fade_to_color: Option<Color32>) {
         self.fade_to_color = fade_to_color;
     }
@@ -140,12 +141,20 @@ impl Painter {
         self.pixels_per_point
     }
 
-    /// Read-only access to the shared [`Fonts`].
+    /// Read-only access to the shared [`FontsView`].
     ///
     /// See [`Context`] documentation for how locks work.
     #[inline]
-    pub fn fonts<R>(&self, reader: impl FnOnce(&Fonts) -> R) -> R {
+    pub fn fonts<R>(&self, reader: impl FnOnce(&FontsView<'_>) -> R) -> R {
         self.ctx.fonts(reader)
+    }
+
+    /// Read-write access to the shared [`FontsView`].
+    ///
+    /// See [`Context`] documentation for how locks work.
+    #[inline]
+    pub fn fonts_mut<R>(&self, reader: impl FnOnce(&mut FontsView<'_>) -> R) -> R {
+        self.ctx.fonts_mut(reader)
     }
 
     /// Where we paint
@@ -524,7 +533,7 @@ impl Painter {
         color: crate::Color32,
         wrap_width: f32,
     ) -> Arc<Galley> {
-        self.fonts(|f| f.layout(text, font_id, color, wrap_width))
+        self.fonts_mut(|f| f.layout(text, font_id, color, wrap_width))
     }
 
     /// Will line break at `\n`.
@@ -538,7 +547,7 @@ impl Painter {
         font_id: FontId,
         color: crate::Color32,
     ) -> Arc<Galley> {
-        self.fonts(|f| f.layout(text, font_id, color, f32::INFINITY))
+        self.fonts_mut(|f| f.layout(text, font_id, color, f32::INFINITY))
     }
 
     /// Lay out this text layut job in a galley.
@@ -547,7 +556,7 @@ impl Painter {
     #[inline]
     #[must_use]
     pub fn layout_job(&self, layout_job: LayoutJob) -> Arc<Galley> {
-        self.fonts(|f| f.layout_job(layout_job))
+        self.fonts_mut(|f| f.layout_job(layout_job))
     }
 
     /// Paint text that has already been laid out in a [`Galley`].

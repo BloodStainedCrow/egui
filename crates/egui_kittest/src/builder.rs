@@ -7,6 +7,8 @@ use std::marker::PhantomData;
 pub struct HarnessBuilder<State = ()> {
     pub(crate) screen_rect: Rect,
     pub(crate) pixels_per_point: f32,
+    pub(crate) theme: egui::Theme,
+    pub(crate) os: egui::os::OperatingSystem,
     pub(crate) max_steps: u64,
     pub(crate) step_dt: f32,
     pub(crate) state: PhantomData<State>,
@@ -19,11 +21,13 @@ impl<State> Default for HarnessBuilder<State> {
         Self {
             screen_rect: Rect::from_min_size(Pos2::ZERO, Vec2::new(800.0, 600.0)),
             pixels_per_point: 1.0,
+            theme: egui::Theme::Dark,
             state: PhantomData,
             renderer: Box::new(LazyRenderer::default()),
             max_steps: 4,
             step_dt: 1.0 / 4.0,
             wait_for_pending_images: true,
+            os: egui::os::OperatingSystem::Nix,
         }
     }
 }
@@ -42,6 +46,28 @@ impl<State> HarnessBuilder<State> {
     #[inline]
     pub fn with_pixels_per_point(mut self, pixels_per_point: f32) -> Self {
         self.pixels_per_point = pixels_per_point;
+        self
+    }
+
+    /// Set the desired theme (dark or light).
+    #[inline]
+    pub fn with_theme(mut self, theme: egui::Theme) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    /// Override the [`egui::os::OperatingSystem`] reported to egui.
+    ///
+    /// This affects e.g. the way shortcuts are displayed. So for snapshot tests,
+    /// it makes sense to set this to a specific OS, so snapshots don't change when running
+    /// the same tests on different OSes.
+    ///
+    /// Default is [`egui::os::OperatingSystem::Nix`].
+    /// Use [`egui::os::OperatingSystem::from_target_os()`] to use the current OS (this restores
+    /// eguis default behavior).
+    #[inline]
+    pub fn with_os(mut self, os: egui::os::OperatingSystem) -> Self {
+        self.os = os;
         self
     }
 
@@ -205,6 +231,7 @@ impl HarnessBuilder {
     ///         });
     ///     });
     /// ```
+    #[must_use]
     pub fn build<'a>(self, app: impl FnMut(&egui::Context) + 'a) -> Harness<'a> {
         Harness::from_builder(self, AppKind::Context(Box::new(app)), (), None)
     }
@@ -224,6 +251,7 @@ impl HarnessBuilder {
     ///         ui.label("Hello, world!");
     ///     });
     /// ```
+    #[must_use]
     pub fn build_ui<'a>(self, app: impl FnMut(&mut egui::Ui) + 'a) -> Harness<'a> {
         Harness::from_builder(self, AppKind::Ui(Box::new(app)), (), None)
     }

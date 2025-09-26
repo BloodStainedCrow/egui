@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use emath::{Align2, Rot2};
+
 use crate::*;
 
 /// How to paint some text on screen.
@@ -13,7 +15,7 @@ pub struct TextShape {
     /// Usually the top left corner of the first character.
     pub pos: Pos2,
 
-    /// The laid out text, from [`Fonts::layout_job`].
+    /// The laid out text, from [`FontsView::layout_job`].
     pub galley: Arc<Galley>,
 
     /// Add this underline to the whole text.
@@ -78,11 +80,22 @@ impl TextShape {
         self
     }
 
-    /// Rotate text by this many radians clockwise.
+    /// Set text rotation to `angle` radians clockwise.
     /// The pivot is `pos` (the upper left corner of the text).
     #[inline]
     pub fn with_angle(mut self, angle: f32) -> Self {
         self.angle = angle;
+        self
+    }
+
+    /// Set the text rotation to the `angle` radians clockwise.
+    /// The pivot is determined by the given `anchor` point on the text bounding box.
+    #[inline]
+    pub fn with_angle_and_anchor(mut self, angle: f32, anchor: Align2) -> Self {
+        self.angle = angle;
+        let a0 = anchor.pos_in_rect(&self.galley.rect).to_vec2();
+        let a1 = Rot2::from_angle(angle) * a0;
+        self.pos += a0 - a1;
         self
     }
 
@@ -117,10 +130,12 @@ impl TextShape {
             num_vertices: _,
             num_indices: _,
             pixels_per_point: _,
+            intrinsic_size,
         } = Arc::make_mut(galley);
 
         *rect = transform.scaling * *rect;
         *mesh_bounds = transform.scaling * *mesh_bounds;
+        *intrinsic_size = transform.scaling * *intrinsic_size;
 
         for text::PlacedRow { pos, row } in rows {
             *pos *= transform.scaling;
@@ -166,11 +181,15 @@ mod tests {
 
     #[test]
     fn text_bounding_box_under_rotation() {
-        let fonts = Fonts::new(1.0, 1024, FontDefinitions::default());
+        let mut fonts = Fonts::new(
+            1024,
+            AlphaFromCoverage::default(),
+            FontDefinitions::default(),
+        );
         let font = FontId::monospace(12.0);
 
         let mut t = crate::Shape::text(
-            &fonts,
+            &mut fonts.with_pixels_per_point(1.0),
             Pos2::ZERO,
             emath::Align2::CENTER_CENTER,
             "testing123",

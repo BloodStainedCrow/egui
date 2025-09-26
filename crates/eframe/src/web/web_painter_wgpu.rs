@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::web_painter::WebPainter;
 use crate::WebOptions;
 use egui::{Event, UserData, ViewportId};
-use egui_wgpu::capture::{capture_channel, CaptureReceiver, CaptureSender, CaptureState};
+use egui_wgpu::capture::{CaptureReceiver, CaptureSender, CaptureState, capture_channel};
 use egui_wgpu::{RenderState, SurfaceErrorAction};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
@@ -236,6 +236,7 @@ impl WebPainter for WebPainterWgpu {
                             }),
                             store: wgpu::StoreOp::Store,
                         },
+                        depth_slice: None,
                     })],
                     depth_stencil_attachment: self.depth_texture_view.as_ref().map(|view| {
                         wgpu::RenderPassDepthStencilAttachment {
@@ -274,17 +275,10 @@ impl WebPainter for WebPainterWgpu {
                         &mut encoder,
                     ));
                 }
-            };
+            }
 
             Some((output_frame, capture_buffer))
         };
-
-        {
-            let mut renderer = render_state.renderer.write();
-            for id in &textures_delta.free {
-                renderer.free_texture(id);
-            }
-        }
 
         // Submit the commands: both the main buffer and user-defined ones.
         render_state
@@ -305,6 +299,16 @@ impl WebPainter for WebPainterWgpu {
             }
 
             frame.present();
+        }
+
+        // Free textures marked for destruction **after** queue submit since they might still be used in the current frame.
+        // Calling `wgpu::Texture::destroy` on a texture that is still in use would invalidate the command buffer(s) it is used in.
+        // However, once we called `wgpu::Queue::submit`, it is up for wgpu to determine how long the underlying gpu resource has to live.
+        {
+            let mut renderer = render_state.renderer.write();
+            for id in &textures_delta.free {
+                renderer.free_texture(id);
+            }
         }
 
         Ok(())
